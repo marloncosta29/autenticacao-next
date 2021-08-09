@@ -1,10 +1,11 @@
 import axios, { AxiosError } from "axios";
 import { parseCookies, setCookie } from "nookies";
 import { signInOut } from "../contexts/AuthContext";
+import { AuthTokenError } from "./errors/AuthTokenErrors";
 let isRefreshing = false;
 let failureRequests: any[] = [];
 
-export function setupApiClient(ctx = undefined){
+export function setupApiClient(ctx = undefined) {
   let cookies = parseCookies(ctx);
 
   const api = axios.create({
@@ -13,7 +14,7 @@ export function setupApiClient(ctx = undefined){
       Authorization: `Bearer ${cookies["token"]}`,
     },
   });
-  
+
   api.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
@@ -22,16 +23,16 @@ export function setupApiClient(ctx = undefined){
           //renova o token
           cookies = parseCookies(ctx);
           const { refreshToken } = cookies;
-  
+
           const originalConfig = error.config;
-  
+
           if (!isRefreshing) {
             isRefreshing = true;
             api
               .post("refresh", { refreshToken })
               .then((response) => {
                 const { token, refreshToken } = response.data;
-  
+
                 console.log({ token });
                 setCookie(ctx, "token", token, {
                   maxAge: 60 * 60 * 24 * 30,
@@ -48,7 +49,7 @@ export function setupApiClient(ctx = undefined){
               .catch((err) => {
                 failureRequests.forEach((request) => request.onFailure(err));
                 failureRequests = [];
-                if(process.browser){
+                if (process.browser) {
                   signInOut();
                 }
               })
@@ -56,7 +57,7 @@ export function setupApiClient(ctx = undefined){
                 isRefreshing = false;
               });
           }
-  
+
           return new Promise((resolve, reject) => {
             failureRequests.push({
               onSuccess: (token: string) => {
@@ -70,15 +71,15 @@ export function setupApiClient(ctx = undefined){
           });
         } else {
           //deslogar
-          if(process.browser){
+          if (process.browser) {
             signInOut();
+          } else {
+            return Promise.reject(new AuthTokenError());
           }
         }
       }
       return Promise.reject(error);
     }
   );
-  return api
+  return api;
 }
-
-

@@ -14,22 +14,42 @@ type SignInCredentials = {
 };
 type AuthContextData = {
   signIn(credentials: SignInCredentials): Promise<void>;
+  signOut(): void;
   isAutenticate: boolean;
   user: User | undefined;
 };
 
+let authChannel: BroadcastChannel;
+
 export const signInOut = () => {
   destroyCookie(undefined, "token");
   destroyCookie(undefined, "refreshToken");
+
+  authChannel.postMessage("logout");
   Router.push("/");
 };
 
-const AuthContext = createContext<AuthContextData>({} as AuthContextData);
+export const AuthContext = createContext<AuthContextData>(
+  {} as AuthContextData
+);
 
 export const AuthProvider: React.FC = ({ children }) => {
   const [user, setUser] = useState<User>();
 
   const isAutenticate = !!user;
+
+  useEffect(() => {
+    authChannel = new BroadcastChannel("auth");
+    authChannel.onmessage = (message) => {
+      switch (message.data) {
+        case "logout":
+          signInOut();
+          break;
+        default:
+          break;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const cookies = parseCookies();
@@ -69,7 +89,9 @@ export const AuthProvider: React.FC = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ isAutenticate, signIn, user }}>
+    <AuthContext.Provider
+      value={{ isAutenticate, signIn, user, signOut: signInOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
